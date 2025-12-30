@@ -1,0 +1,19 @@
+# Environment variables
+.env
+
+# Videos
+*.mp4
+*.avi
+*.mov
+
+# Python
+__pycache__/
+*.pyc
+codenv/
+.env/
+count_detect.py
+
+# OS
+.DS_Store
+
+yolo11n.pt
