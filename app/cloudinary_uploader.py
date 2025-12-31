@@ -27,4 +27,4 @@ def upload_video(video_path):
     chunk_size=6000000,   # 6MB chunks (important)
     timeout=300           # 5 minutes
 )
-    return result["secure_url"]
+    return result["playback_url"]

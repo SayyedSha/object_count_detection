@@ -16,4 +16,4 @@ count_detect.py
 # OS
 .DS_Store
 
-yolo11n.pt
+*.pt

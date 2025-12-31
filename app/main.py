@@ -1,5 +1,6 @@
 import os
 import uuid
+import shutil
 from fastapi import FastAPI, UploadFile, File, HTTPException
 
 from app.detector import detect_and_count_objects
@@ -28,20 +29,19 @@ def process_video(file: UploadFile = File(...)):
     output_path = os.path.join(OUTPUT_DIR, f"{video_id}_output.mp4")
 
     # -----------------------------
-    # Save uploaded video
+    # Save uploaded video (SAFE)
     # -----------------------------
     with open(input_path, "wb") as buffer:
-        buffer.write(file.file.read())
+        shutil.copyfileobj(file.file, buffer)
 
     # -----------------------------
-    # Run YOLO detection (720p + GPU)
+    # Run YOLO detection ONCE
     # -----------------------------
-    detect_and_count_objects(
-    video_path=input_path,
-    output_video_path=output_path,
-    model_path="yolo11n.pt"
-)
-
+    counts = detect_and_count_objects(
+        video_path=input_path,
+        output_video_path=output_path,
+        model_path="yolo11l.pt"   # choose ONE model
+    )
 
     # -----------------------------
     # Upload to Cloudinary
@@ -50,5 +50,6 @@ def process_video(file: UploadFile = File(...)):
 
     return {
         "status": "success",
-        "video_url": video_url
+        "video_url": video_url,
+        "counts": counts
     }

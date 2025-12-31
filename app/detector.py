@@ -1,6 +1,35 @@
 import cv2
 import torch
+from collections import defaultdict
 from ultralytics import YOLO
+
+def resize_with_aspect_ratio(image, target_size):
+    target_w, target_h = target_size
+    h, w = image.shape[:2]
+
+    scale = min(target_w / w, target_h / h)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    resized = cv2.resize(image, (new_w, new_h))
+
+    pad_w = target_w - new_w
+    pad_h = target_h - new_h
+
+    top = pad_h // 2
+    bottom = pad_h - top
+    left = pad_w // 2
+    right = pad_w - left
+
+    padded = cv2.copyMakeBorder(
+        resized,
+        top, bottom, left, right,
+        cv2.BORDER_CONSTANT,
+        value=(0, 0, 0)  # black padding
+    )
+
+    return padded
+
 
 
 def detect_and_count_objects(
@@ -9,16 +38,13 @@ def detect_and_count_objects(
     model_path,
     output_size=(1280, 720),
 
-    # ===== Label Styling =====
+    # Styling
     font=cv2.FONT_HERSHEY_SIMPLEX,
     font_scale=0.7,
     thickness=2,
-    box_color=(255, 0, 0),      # Blue (BGR)
-    text_color=(0, 255, 0),     # Green
+    box_color=(255, 0, 0),
+    text_color=(0, 255, 0),
 ):
-    # -----------------------------
-    # Device (GPU if available)
-    # -----------------------------
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
@@ -39,43 +65,41 @@ def detect_and_count_objects(
         (out_w, out_h)
     )
 
+    class_id_map = defaultdict(set)
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Resize to 720p
-        frame = cv2.resize(frame, (out_w, out_h))
+        # ✅ Resize WITHOUT distortion
+        frame = resize_with_aspect_ratio(frame, (out_w, out_h))
 
-        # -----------------------------
-        # YOLO Detection
-        # -----------------------------
-        results = model(
+        # YOLO tracking
+        results = model.track(
             frame,
             device=device,
+            persist=True,
             conf=0.4,
             verbose=False
         )[0]
 
-        object_count = 0
-
-        if results.boxes is not None:
+        if results.boxes is not None and results.boxes.id is not None:
             boxes = results.boxes.xyxy.cpu().numpy()
             classes = results.boxes.cls.cpu().numpy()
+            track_ids = results.boxes.id.cpu().numpy()
 
-            object_count = len(boxes)
-
-            for box, cls_id in zip(boxes, classes):
+            for box, cls_id, track_id in zip(boxes, classes, track_ids):
                 x1, y1, x2, y2 = map(int, box)
-                label = model.names[int(cls_id)]
+                class_name = model.names[int(cls_id)]
 
-                # Draw box
+                class_id_map[class_name].add(int(track_id))
+
                 cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, thickness)
 
-                # Draw label
                 cv2.putText(
                     frame,
-                    label,
+                    f"{class_name} #{int(track_id)}",
                     (x1, y1 - 10),
                     font,
                     font_scale,
@@ -83,21 +107,24 @@ def detect_and_count_objects(
                     thickness,
                 )
 
-        # -----------------------------
-        # Draw total count
-        # -----------------------------
-        cv2.putText(
-            frame,
-            f"Total Objects: {object_count}",
-            (20, 40),
-            font,
-            1.0,
-            (0, 0, 255),
-            2
-        )
+        # Live counts
+        y_offset = 40
+        for cls, ids in class_id_map.items():
+            cv2.putText(
+                frame,
+                f"{cls}: {len(ids)}",
+                (20, y_offset),
+                font,
+                0.8,
+                (0, 0, 255),
+                2
+            )
+            y_offset += 30
 
         writer.write(frame)
 
     cap.release()
     writer.release()
     cv2.destroyAllWindows()
+
+    return {cls: len(ids) for cls, ids in class_id_map.items()}
