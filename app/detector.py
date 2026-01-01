@@ -3,6 +3,8 @@ import torch
 from collections import defaultdict
 from ultralytics import YOLO
 
+allowed_classes = ["person", "car", "truck", "motorcycle", "boat"]
+
 def resize_with_aspect_ratio(image, target_size):
     target_w, target_h = target_size
     h, w = image.shape[:2]
@@ -21,15 +23,12 @@ def resize_with_aspect_ratio(image, target_size):
     left = pad_w // 2
     right = pad_w - left
 
-    padded = cv2.copyMakeBorder(
+    return cv2.copyMakeBorder(
         resized,
         top, bottom, left, right,
         cv2.BORDER_CONSTANT,
-        value=(0, 0, 0)  # black padding
+        value=(0, 0, 0)
     )
-
-    return padded
-
 
 
 def detect_and_count_objects(
@@ -50,6 +49,16 @@ def detect_and_count_objects(
 
     model = YOLO(model_path)
     model.to(device)
+
+    # -----------------------------
+    # Convert allowed class names → IDs
+    # -----------------------------
+    if allowed_classes:
+        allowed_class_ids = {
+            k for k, v in model.names.items() if v in allowed_classes
+        }
+    else:
+        allowed_class_ids = None  # allow all
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -72,10 +81,8 @@ def detect_and_count_objects(
         if not ret:
             break
 
-        # ✅ Resize WITHOUT distortion
         frame = resize_with_aspect_ratio(frame, (out_w, out_h))
 
-        # YOLO tracking
         results = model.track(
             frame,
             device=device,
@@ -90,13 +97,18 @@ def detect_and_count_objects(
             track_ids = results.boxes.id.cpu().numpy()
 
             for box, cls_id, track_id in zip(boxes, classes, track_ids):
-                x1, y1, x2, y2 = map(int, box)
-                class_name = model.names[int(cls_id)]
+                cls_id = int(cls_id)
 
+                # ✅ Filter classes
+                if allowed_class_ids is not None and cls_id not in allowed_class_ids:
+                    continue
+
+                class_name = model.names[cls_id]
                 class_id_map[class_name].add(int(track_id))
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, thickness)
+                x1, y1, x2, y2 = map(int, box)
 
+                cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, thickness)
                 cv2.putText(
                     frame,
                     f"{class_name} #{int(track_id)}",
