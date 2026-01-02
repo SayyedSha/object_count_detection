@@ -2,6 +2,7 @@ import cv2
 import torch
 from collections import defaultdict
 from ultralytics import YOLO
+import app.cloudinary_uploader as cd
 
 allowed_classes = ["person", "car", "truck", "motorcycle", "boat"]
 
@@ -140,3 +141,58 @@ def detect_and_count_objects(
     cv2.destroyAllWindows()
 
     return {cls: len(ids) for cls, ids in class_id_map.items()}
+
+processed_video = None
+def getvideo(video):
+    # print(video)
+    if video == "demo-1.mp4":
+        processed_video = cd.get_cloudinary_playback_url("processed_videos/puvgat92h1qdqphgucrz")
+
+        return {
+            "status": "success",
+            "video_url": processed_video,
+            "counts": [
+                {
+                    "object": "person",
+                    "count": 62
+                },
+                {
+                    "object": "motorcycle",
+                    "count": 13
+                },
+                {
+                    "object": "car",
+                    "count": 73
+                },
+                {
+                    "object": "truck",
+                    "count": 21
+                }
+            ]
+        }
+    elif video == "demo-2.mp4":
+        processed_video = cd.get_cloudinary_playback_url("processed_videos/yjsvq4zaukliptxhddir")
+
+        return {
+            "status":"success",
+             "video_url":processed_video,
+             "counts":[{"object":"car","count":212},{"object":"truck","count":58},{"object":"person","count":2},{"object":"motorcycle","count":2}]
+        }
+    
+    elif video == "demo-3.mp4":
+        processed_video = cd.get_cloudinary_playback_url("processed_videos/yph9jdkrklvs9b3gv4ia")
+        
+        return {
+            "status": "success",
+            "video_url":processed_video,
+            "counts": [
+                {
+                    "object": "person",
+                    "count": 170
+                },
+                {
+                    "object": "car",
+                    "count": 1
+                }
+            ]
+        }
