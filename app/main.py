@@ -1,10 +1,12 @@
 import os
 import uuid
 import shutil
+import asyncio
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.detector import detect_and_count_objects
+from app.detector import detect_and_count_objects, getvideo
 from app.cloudinary_uploader import upload_video
 
 app = FastAPI()
@@ -60,3 +62,11 @@ def process_video(file: UploadFile = File(...)):
         "counts": counts_array
     }
 
+@app.post("/video")
+async def getVideo(file: UploadFile = File(...)):
+    if not file.content_type.startswith("video/"):
+        raise HTTPException(status_code=400, detail="Invalid video file")
+    original_filename = file.filename 
+    res = getvideo(original_filename)
+    await asyncio.sleep(10)
+    return res
