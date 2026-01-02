@@ -1,5 +1,6 @@
 import cloudinary
 import cloudinary.uploader
+import cloudinary.api
 import os
 from dotenv import load_dotenv
 
@@ -24,7 +25,20 @@ def upload_video(video_path):
     video_path,
     resource_type="video",
     folder="processed_videos",
-    chunk_size=6000000,   # 6MB chunks (important)
-    timeout=300           # 5 minutes
+    # chunk_size=6000000,   # 6MB chunks (important)
+    # timeout=300           # 5 minutes
 )
+    # print(result)
     return result["playback_url"]
+
+
+def get_cloudinary_playback_url(public_id: str) -> str:
+    """
+    Returns adaptive streaming (HLS) playback URL
+    """
+    result = cloudinary.api.resource(
+        public_id,
+        resource_type="video"
+    )
+
+    return result["secure_url"].replace(".mp4", ".m3u8")
